@@ -5,20 +5,23 @@ from dash import dcc, html, Input, Output
 import dash_bootstrap_components as dbc
 import plotly.express as px
 
-# Đọc dữ liệu từ file
+# Đọc dữ liệu từ file 
 metadata = pd.read_csv('states.csv')
 df_usa_raw = pd.read_csv('Airline_Delay_Cause.csv')
 df_usa = df_usa_raw.copy()
 
-# Thêm cột state_id trích xuất từ cột airport_name và lấy ra cột arr_del15 đếm số lượng chuyến bay bị trễ
-df_usa['airport_name']=df_usa['airport_name'].astype('string')
-df_usa['state_id'] = df_usa['airport_name']
-
+# Hàm trích xuất 2 ký tự trong tên sân bay sang mã bang
 def getState(str):
     delim1 = ', '
     delim2 = ':'
     s = str[str.find(delim1) + 1 : str.find(delim2)]
     return s.replace(' ', '')
+
+
+# df_usa
+# Thêm cột state_id trích xuất từ cột airport_name và lấy ra cột arr_del15 đếm số lượng chuyến bay bị trễ
+df_usa['airport_name'] = df_usa['airport_name'].astype('string')
+df_usa['state_id'] = df_usa['airport_name']
     
 df_usa['state_id'] = df_usa['state_id'].apply(lambda x: getState(x))
 df_usa = df_usa[df_usa['arr_del15'].notna()]
@@ -26,21 +29,27 @@ df_usa['arr_del15'] = df_usa['arr_del15'].astype(int)
 df_usa['year'] = df_usa['year'].astype(int)
 
 # Gom nhóm theo từng năm và từng bang
-df_usa = df_usa[['year', 'state_id', 'arr_del15']]
-df_usa = df_usa.groupby(['year', 'state_id'])['arr_del15'].agg('sum').reset_index()
-df_usa2 = df_usa.copy()
+df_usa = df_usa[['year', 'state_id', 'arr_flights', 'arr_del15']]
+df_usa2 = df_usa.groupby(['year', 'state_id'])['arr_flights', 'arr_del15'].agg('sum').reset_index()
+df_usa2['delay_ratio'] = round(df_usa2['arr_del15'] / df_usa2['arr_flights'] * 100, 2)
 
+# Tạo thêm 2 dataframe df_flights và df_del15 để ghép với dataframe phía sau
+df_flights = df_usa2[['year', 'state_id', 'arr_flights']]
+df_del15 = df_usa2[['year', 'state_id', 'arr_del15']]
+
+
+# -----------------------------------------------------------------------------------------------------
 # Lấy ra danh sách các bang làm hàng của dataframe
 list_states = df_usa2['state_id'].drop_duplicates().sort_values().to_list()
 list_years = df_usa2['year'].drop_duplicates().sort_values().to_list()
 
-# Hàm trả về số chuyến bay trễ ở tất cả các bang khi biết năm
+# Hàm trả về % số chuyến bay trễ ở tất cả các bang khi biết năm
 def count_by_state(year):
     flights = []
     sort_year = df_usa2[df_usa2['year'] == year]
     
     for state in list_states:
-        a = sort_year[sort_year['state_id'] == state]['arr_del15'].to_list()
+        a = sort_year[sort_year['state_id'] == state]['delay_ratio'].to_list()
         if len(a) != 0:
             flights.append(a[0])
         else:
@@ -48,7 +57,7 @@ def count_by_state(year):
 
     return flights
 
-# list_time chứa số chuyến bay trễ từ 2017-2022 ứng với từng năm
+# list_time chứa % số chuyến bay trễ từ 2017-2022 ứng với từng năm
 flights_each_year = []
 for year in list_years:
     flights_each_year.append(count_by_state(year))
@@ -62,18 +71,24 @@ flights_each_year_df['state_id'] = flights_each_year_df.index
 flights_each_year_df.columns = ['2017', '2018', '2019', '2020', '2021', '2022', 'state_id']
 new_df = pd.merge(left = flights_each_year_df, right = metadata, on = 'state_id', how = 'inner')
 
+
 # Thêm mảng year làm thanh trượt thời gian
 year = [str(i + 2017) for i in range(6)]
 column_names = ['state_id', 'state_name']
 
 _df = pd.melt(new_df, id_vars = column_names, value_vars = year)
 _df = _df.rename(columns={'variable': 'year'})
-_df = _df.rename(columns={'value': 'arr_del15'})
+_df = _df.rename(columns={'value': 'delay_ratio'})
 
 df = _df.copy()
 df['year'] = df['year'].astype(int)
 
+# Ghép với df_flights và df_del15
+df = pd.merge(left = df, right = df_flights, on = ['state_id', 'year'], how = 'inner')
+df = pd.merge(left = df, right = df_del15, on = ['state_id', 'year'], how = 'inner')
 
+
+# -----------------------------------------------------------------------------------------------------
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.LITERA])
 
 app.layout = dbc.Container(html.Div([
@@ -85,7 +100,7 @@ app.layout = dbc.Container(html.Div([
     ),
 
     dbc.Row(dbc.Col(html.Div([
-        html.H3("Số chuyến bay bị trễ ở mỗi bang thay đổi như thế nào qua các năm?", style={'paddingTop': 50, 'color': '#084081'}),
+        html.H3("Tỉ lệ trễ chuyến ở mỗi bang thay đổi như thế nào qua các năm?", style={'paddingTop': 50, 'color': '#084081'}),
         html.H5("TỪ BIỂU ĐỒ NÀY TA CÓ THỂ: so sánh giữa các bang với nhau", style={'color': '#2b8cbe'}),
         html.Hr(style={'color': "#2b8cbe", 'paddingBottom': 10, 'marginBottom': 50})
     ]))),
@@ -109,7 +124,7 @@ app.layout = dbc.Container(html.Div([
 
                 # interactive map incl. slider - tạo interactive slider
                 dbc.Col(html.Div([
-                    html.H5("Số chuyến bay trễ chuyến tại các bang từ 2017 đến nửa đầu 2022"),
+                    html.H5("Tỉ lệ trễ chuyến tại các bang từ 2017 đến nửa đầu 2022"),
                     html.H6("California, Texas và Florida là ba bang có nhiều chuyến bay trễ chuyến nhất tại Hoa Kỳ và tương đối ổn định qua các năm, nhất là trong giai đoạn 2018-2021", style={"color": '#95a5a6'}),
                     html.Br(),
                     dcc.Graph(id="graph-with-slider", hoverData={'points': [{'customdata': 'WLD'}]}),
@@ -151,12 +166,12 @@ def update_figure(selected_year):
 
     # Tạo choropleth map
     world_map = px.choropleth(filtered_df, locations=filtered_df['state_id'], locationmode='USA-states',
-                              color=filtered_df.arr_del15,
+                              color=filtered_df.delay_ratio,
                               color_continuous_scale=color_scale,
-                              scope = 'usa', labels={'arr_del15': 'Delay Flights'},
-                              range_color=[20, 170000],
+                              scope = 'usa', labels={'delay_ratio': 'Delay ratio'},
+                              range_color=[7, 35],
                               hover_name='state_name',
-                              hover_data=['arr_del15'],
+                              hover_data=['arr_flights', 'arr_del15', 'delay_ratio'],
                               title = 'US Flights',
                               basemap_visible=False)
     world_map.update_layout(transition_duration=500,
