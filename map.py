@@ -108,24 +108,19 @@ app.layout = dbc.Container(html.Div([
     dbc.Row(
             [
                 dbc.Col(html.Div([
-                    html.Div("Life expectancy tells us a lot about the state of a society and is a key metric worth "
-                             "studying. This is why the world map shows the latest data published by the World Bank "
-                             "for 'life expectancy at birth', measured in years. This metric indicates"
-                             "the number of years a newborn infant would live if current mortality trends at the"
-                             "time of its birth were to persist throughout its life."),
+                    html.Div("Qua 6 năm, tỉ lệ trễ chuyến bay ở mỗi bang chưa có dấu hiệu giảm xuống. Ngoại trừ năm 2020 do số chuyến bay giảm đột ngột nên tỉ lệ trễ chuyến cũng giảm theo, các năm còn lại chưa cho thấy sự nỗ lực của hàng không Mỹ trong việc giảm thiểu tỉ lệ các chuyến bay trễ chuyến. "),
                     html.Br(),
-                    html.Div("Since industrialization, life expectancy has steadily improved worldwide. "
-                             "In this analysis, we look at the last few decades, from 2017 to 2022. "),
+                    html.Div("Các khu vực hàng không trọng điểm của Hoa Kỳ tập trung ở phía Nam (khu vực có nhiều chuyến bay nhất), tại các bang California, Texas và Florida. Florida có tỉ lệ trễ chuyến cao nhất trong 3 tiểu bang ở hầu hết các năm. "),
                     html.Br(),
                     html.Div(
-                             "Hover over any country to view the changing life expectancy there, "
-                             "or use the slider to see the change through time below the map.",
+                             "Nhìn chung, từ 2017-2019 và 2021-nửa đầu 2022, xu hướng trễ chuyến tăng dần từ Tây sang Đông. "
+                             "Năm 2020, tỉ lệ trễ chuyến tại các bang giảm đáng kể, số chuyến bay cũng giảm do ảnh hưởng của Covid-19.",
                         style={"font-weight": "bold"})]), width=3),
 
                 # interactive map incl. slider - tạo interactive slider
                 dbc.Col(html.Div([
-                    html.H5("Tỉ lệ trễ chuyến tại các bang từ 2017 đến nửa đầu 2022"),
-                    html.H6("California, Texas và Florida là ba bang có nhiều chuyến bay trễ chuyến nhất tại Hoa Kỳ và tương đối ổn định qua các năm, nhất là trong giai đoạn 2018-2021", style={"color": '#95a5a6'}),
+                    html.H5("Tỉ lệ trễ chuyến tại 50 bang từ 2017 đến nửa đầu 2022"),
+                    html.H6("Di chuyển chuột vào các tiểu bang để hiển thị thông tin về số chuyến bay (arr_flights), số chuyến trễ (arr_del15) và tỉ lệ trễ chuyến (delay_ratio); chọn/kéo slider bên dưới để hiển thị mốc thời gian. ", style={"color": '#95a5a6'}),
                     html.Br(),
                     dcc.Graph(id="graph-with-slider", hoverData={'points': [{'customdata': 'WLD'}]}),
                     dcc.Slider(
