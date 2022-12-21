@@ -5,10 +5,12 @@ from dash import dcc, html, Input, Output
 import dash_bootstrap_components as dbc
 import plotly.express as px
 
+# Đọc dữ liệu từ file
 metadata = pd.read_csv('states.csv')
 df_usa_raw = pd.read_csv('Airline_Delay_Cause.csv')
 df_usa = df_usa_raw.copy()
 
+# Thêm cột state_id trích xuất từ cột airport_name và lấy ra cột arr_del15 đếm số lượng chuyến bay bị trễ
 df_usa['airport_name']=df_usa['airport_name'].astype('string')
 df_usa['state_id'] = df_usa['airport_name']
 
@@ -19,25 +21,26 @@ def getState(str):
     return s.replace(' ', '')
     
 df_usa['state_id'] = df_usa['state_id'].apply(lambda x: getState(x))
-df_usa = df_usa[df_usa['arr_flights'].notna()]
-df_usa['arr_flights'] = df_usa['arr_flights'].astype(int)
+df_usa = df_usa[df_usa['arr_del15'].notna()]
+df_usa['arr_del15'] = df_usa['arr_del15'].astype(int)
 df_usa['year'] = df_usa['year'].astype(int)
 
-df_usa = df_usa[['year', 'state_id', 'arr_flights']]
-df_usa = df_usa.groupby(['year', 'state_id'])['arr_flights'].agg('count').reset_index()
-
+# Gom nhóm theo từng năm và từng bang
+df_usa = df_usa[['year', 'state_id', 'arr_del15']]
+df_usa = df_usa.groupby(['year', 'state_id'])['arr_del15'].agg('sum').reset_index()
 df_usa2 = df_usa.copy()
+
 # Lấy ra danh sách các bang làm hàng của dataframe
 list_states = df_usa2['state_id'].drop_duplicates().sort_values().to_list()
 list_years = df_usa2['year'].drop_duplicates().sort_values().to_list()
 
-# hàm trả về thời gian chờ từ 2017-2022 khi biết mã hãng hàng không
+# Hàm trả về số chuyến bay trễ ở tất cả các bang khi biết năm
 def count_by_state(year):
     flights = []
     sort_year = df_usa2[df_usa2['year'] == year]
     
     for state in list_states:
-        a = sort_year[sort_year['state_id'] == state]['arr_flights'].to_list()
+        a = sort_year[sort_year['state_id'] == state]['arr_del15'].to_list()
         if len(a) != 0:
             flights.append(a[0])
         else:
@@ -45,25 +48,27 @@ def count_by_state(year):
 
     return flights
 
-# list_time chứa thời gian chờ từ 2017-2022 ứng với từng hãng hàng không
+# list_time chứa số chuyến bay trễ từ 2017-2022 ứng với từng năm
 flights_each_year = []
 for year in list_years:
     flights_each_year.append(count_by_state(year))
 
 flights_through_years = dict(zip(list_years, flights_each_year))
 
-# Tạo dataframe từ list_carriers và index lấy từ list_years
+# Tạo dataframe từ lights_through_years và index lấy từ list_states
+# Đổi tên cột và merge với metadata
 flights_each_year_df = pd.DataFrame(flights_through_years, index = list_states)
 flights_each_year_df['state_id'] = flights_each_year_df.index
 flights_each_year_df.columns = ['2017', '2018', '2019', '2020', '2021', '2022', 'state_id']
 new_df = pd.merge(left = flights_each_year_df, right = metadata, on = 'state_id', how = 'inner')
 
+# Thêm mảng year làm thanh trượt thời gian
 year = [str(i + 2017) for i in range(6)]
 column_names = ['state_id', 'state_name']
 
 _df = pd.melt(new_df, id_vars = column_names, value_vars = year)
 _df = _df.rename(columns={'variable': 'year'})
-_df = _df.rename(columns={'value': 'arr_flights'})
+_df = _df.rename(columns={'value': 'arr_del15'})
 
 df = _df.copy()
 df['year'] = df['year'].astype(int)
@@ -80,7 +85,7 @@ app.layout = dbc.Container(html.Div([
     ),
 
     dbc.Row(dbc.Col(html.Div([
-        html.H3("Số chuyến bay ở mỗi bang thay đổi như thế nào qua các năm?", style={'paddingTop': 50, 'color': '#084081'}),
+        html.H3("Số chuyến bay bị trễ ở mỗi bang thay đổi như thế nào qua các năm?", style={'paddingTop': 50, 'color': '#084081'}),
         html.H5("TỪ BIỂU ĐỒ NÀY TA CÓ THỂ: so sánh giữa các bang với nhau", style={'color': '#2b8cbe'}),
         html.Hr(style={'color': "#2b8cbe", 'paddingBottom': 10, 'marginBottom': 50})
     ]))),
@@ -102,10 +107,10 @@ app.layout = dbc.Container(html.Div([
                              "or use the slider to see the change through time below the map.",
                         style={"font-weight": "bold"})]), width=3),
 
-                # interactive map incl. slider
+                # interactive map incl. slider - tạo interactive slider
                 dbc.Col(html.Div([
-                    html.H5("Số chuyến bay xuất phát tại các bang từ 2017 đến nửa đầu 2022"),
-                    html.H6("California, Texas và Florida là ba bang có nhiều chuyến bay xuất phát nhất tại Hoa Kỳ và tương đối ổn định qua các năm, nhất là trong giai đoạn 2018-2021", style={"color": '#95a5a6'}),
+                    html.H5("Số chuyến bay trễ chuyến tại các bang từ 2017 đến nửa đầu 2022"),
+                    html.H6("California, Texas và Florida là ba bang có nhiều chuyến bay trễ chuyến nhất tại Hoa Kỳ và tương đối ổn định qua các năm, nhất là trong giai đoạn 2018-2021", style={"color": '#95a5a6'}),
                     html.Br(),
                     dcc.Graph(id="graph-with-slider", hoverData={'points': [{'customdata': 'WLD'}]}),
                     dcc.Slider(
@@ -133,7 +138,7 @@ app.layout = dbc.Container(html.Div([
 # CONNECT THE GRAPHS WITH DASH COMPONENTS AND ALLOW INTERACTIVITY
 
 
-# interactive world map - choropleth map
+# Tạo một interactive world map - choropleth map
 @app.callback(
     Output(component_id='graph-with-slider', component_property='figure'),
     [Input(component_id='year-slider', component_property='value')]
@@ -141,17 +146,17 @@ app.layout = dbc.Container(html.Div([
 def update_figure(selected_year):
     color_scale = ['#ffffff', '#f7fcf0', '#e0f3db', '#ccebc5', '#a8ddb5', '#7bccc4', '#4eb3d3', '#2b8cbe',
                    '#0868ac', '#084081']
-    # reaction of the map to moving the slider to a different year
+    # Hiệu ứng chuyển slider sang năm khác
     filtered_df = df[df.year == selected_year].reset_index()
 
-    # creation and layout of choropleth map
+    # Tạo choropleth map
     world_map = px.choropleth(filtered_df, locations=filtered_df['state_id'], locationmode='USA-states',
-                              color=filtered_df.arr_flights,
+                              color=filtered_df.arr_del15,
                               color_continuous_scale=color_scale,
-                              scope = 'usa', labels={'arr_flights': 'No. of Flights'},
-                              range_color=[10, 1100],
+                              scope = 'usa', labels={'arr_del15': 'Delay Flights'},
+                              range_color=[20, 170000],
                               hover_name='state_name',
-                              hover_data=['arr_flights'],
+                              hover_data=['arr_del15'],
                               title = 'US Flights',
                               basemap_visible=False)
     world_map.update_layout(transition_duration=500,
