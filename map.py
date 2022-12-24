@@ -30,7 +30,7 @@ df_usa['year'] = df_usa['year'].astype(int)
 
 # Gom nhóm theo từng năm và từng bang
 df_usa = df_usa[['year', 'state_id', 'arr_flights', 'arr_del15']]
-df_usa2 = df_usa.groupby(['year', 'state_id'])['arr_flights', 'arr_del15'].agg('sum').reset_index()
+df_usa2 = df_usa.groupby(['year', 'state_id'])[['arr_flights', 'arr_del15']].agg('sum').reset_index()
 df_usa2['delay_ratio'] = round(df_usa2['arr_del15'] / df_usa2['arr_flights'] * 100, 2)
 
 # Tạo thêm 2 dataframe df_flights và df_del15 để ghép với dataframe phía sau
